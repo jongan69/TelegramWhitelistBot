@@ -51,7 +51,7 @@ After installation, you can run the bot with:
 python <name-of-script>.py
 ```
 
-Replace `<name-of-script>.py` with the actual name of the script file ie main.py or main2.py.
+Replace `<name-of-script>.py` with the actual name of the script file ie `main.py`.
 
 ## Features
 

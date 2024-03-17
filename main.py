@@ -2,14 +2,87 @@ import os
 import re
 import json
 from dotenv import load_dotenv
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import itertools
 
 load_dotenv()  # Take environment variables from .env.
-
 YOUR_BOT_TOKEN = os.environ.get("YOUR_BOT_TOKEN")
-
-# Regular expression for detecting Solana addresses.
 SOLANA_ADDRESS_PATTERN = r"\b[1-9A-HJ-NP-Za-km-z]{32,44}\b"
+
+toggle = itertools.cycle([True, False]).__next__
+YAP = False
+
+async def is_user_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Check if the user is an admin of the chat."""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # For private chats, the user is considered an admin.
+    if update.effective_chat.type == "private":
+        return True
+
+    # Check admin status in non-private chats.
+    admins = await context.bot.get_chat_administrators(chat_id)
+    return any(admin.user.id == user_id for admin in admins)
+
+async def start_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Allow adding of new addresses if the user is an admin."""
+    if not await is_user_admin(update, context):
+        if YAP:
+            await update.message.reply_text("This command can only be used by administrators.")
+        return
+    
+    chat_id = str(update.message.chat.id)
+    addresses = read_addresses()
+    if chat_id not in addresses:
+        addresses[chat_id] = {"adding_allowed": False, "addresses": {}}
+    addresses[chat_id]['adding_allowed'] = True
+    write_addresses(addresses)
+    if YAP:
+        await update.message.reply_text("Adding new Solana addresses is now allowed.")
+
+async def stop_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Stop adding of new addresses if the user is an admin."""
+    if not await is_user_admin(update, context):
+        if YAP:
+            await update.message.reply_text("This command can only be used by administrators.")
+        return
+    
+    chat_id = str(update.message.chat.id)
+    addresses = read_addresses()
+    if chat_id not in addresses:
+        addresses[chat_id] = {"adding_allowed": False, "addresses": {}}
+    addresses[chat_id]['adding_allowed'] = False
+    write_addresses(addresses)
+    if YAP:
+        await update.message.reply_text("Adding new Solana addresses is now disabled.")
+
+async def message_handler(update, context: ContextTypes.DEFAULT_TYPE):
+    """Check every message for Solana addresses and ensure no duplicates are saved, managing a separate list for each chat."""
+    chat_id = str(update.message.chat.id)
+    user_id = str(update.effective_user.id)
+    message_text = update.message.text
+    
+    addresses = read_addresses()
+    if chat_id not in addresses or not addresses[chat_id].get('adding_allowed', False):
+        if YAP:
+            await update.message.reply_text("Adding new Solana addresses is currently not allowed in this chat.")
+        return
+
+    solana_matches = re.findall(SOLANA_ADDRESS_PATTERN, message_text)
+    if solana_matches:
+        for address in solana_matches:
+            if user_id not in addresses[chat_id]["addresses"]:
+                addresses[chat_id]["addresses"][user_id] = address
+                write_addresses(addresses)
+                await update.message.reply_text(f"Saved Solana address: {address}")
+            else:
+                if YAP:
+                    await update.message.reply_text("Each user can only save one address.")
+    else:
+        if YAP:
+            await update.message.reply_text("Please provide a valid Solana address. This whitelist only accepts Solana addresses.")
 
 def read_addresses():
     """Read the addresses from the JSON file."""
@@ -19,37 +92,11 @@ def read_addresses():
     except FileNotFoundError:
         return {}
 
-def save_address(chat_id, address):
-    """Save the detected Solana address to a JSON file by chat ID, ensuring no duplicates."""
-    addresses = read_addresses()
-    if chat_id not in addresses:
-        addresses[chat_id] = []
-    if address not in addresses[chat_id]:  # Check if the address is not already in the list for this chat
-        addresses[chat_id].append(address)
-        with open("solana_addresses_by_chat.json", "w") as file:
-            json.dump(addresses, file, indent=4)
-            return True  # Indicate that the address was new and saved
-    return False  # Indicate that the address was a duplicate and not saved
-
-async def message_handler(update, context: ContextTypes.DEFAULT_TYPE):
-    """Check every message for Solana addresses and ensure no duplicates are saved, managing a separate list for each chat."""
-    chat_type = update.message.chat.type
-    if chat_type != "private":
-        chat_id = str(update.message.chat.id)
-        message_text = update.message.text
+def write_addresses(addresses):
+    """Write the addresses to the JSON file."""
+    with open("solana_addresses_by_chat.json", "w") as file:
+        json.dump(addresses, file, indent=4)
         
-        solana_matches = re.findall(SOLANA_ADDRESS_PATTERN, message_text)
-        if solana_matches:
-            for address in solana_matches:
-                if save_address(chat_id, address):  # Only reply if the address was new and saved
-                    await update.message.reply_text(f"Saved Solana address: {address}")
-                else:
-                    await update.message.reply_text("This Solana address is already saved in this chat.")
-        else:
-            await update.message.reply_text("Please provide a valid Solana address. This whitelist only accepts Solana addresses.")
-    else:
-        await update.message.reply_text("Please add me to a group or channel to manage Solana addresses for everyone you lilShid")
-
 async def list_addresses(update, context: ContextTypes.DEFAULT_TYPE):
     """List all whitelisted Solana addresses for the chat, in chunks if necessary."""
     chat_id = str(update.message.chat.id)
@@ -71,13 +118,27 @@ async def list_addresses(update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(current_message)
     else:
         await update.message.reply_text("No whitelisted Solana addresses found for this chat.")
-
+        
+async def toggleYap(update, context: ContextTypes.DEFAULT_TYPE):
+    global YAP  # Declare the variable as global to modify it
+    if not await is_user_admin(update, context):
+        if YAP:
+            await update.message.reply_text("This command can only be used by administrators.")
+        return
+    YAP = toggle()
+    await update.message.reply_text(f"Yapp is set to {YAP}")
+    return YAP
+    
 def main():
-    token = YOUR_BOT_TOKEN
-    application = Application.builder().token(token).build()
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    
+    application = Application.builder().token(YOUR_BOT_TOKEN).build()
+    application.add_handler(CommandHandler("yap", toggleYap))
+    application.add_handler(CommandHandler("start", start_adding))
+    application.add_handler(CommandHandler("stop", stop_adding))
     application.add_handler(CommandHandler("list", list_addresses))  # Register the /list command handler
-    print("Telegram Bot started with channel-specific Solana address whitelist and no duplicates!", flush=True)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+
+    print("Bot started with enhanced functionality!", flush=True)
     application.run_polling()
 
 if __name__ == '__main__':
