@@ -105,8 +105,11 @@ async def list_addresses(update, context: ContextTypes.DEFAULT_TYPE):
         # Prepare the initial part of the message.
         base_message = "Whitelisted Solana addresses:\n"
         current_message = base_message
+        all_addresses = addresses[chat_id]["addresses"]
 
-        for address in addresses[chat_id]:
+        for user in all_addresses:
+            address = all_addresses[user]
+            print(f"User {user} has wallet {address}")
             # If adding another address exceeds the limit, send the current message and start a new one.
             if len(current_message) + len(address) + 1 > 4096:  # +1 for the newline character
                 await update.message.reply_text(current_message)
