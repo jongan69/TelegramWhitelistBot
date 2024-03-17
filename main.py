@@ -135,8 +135,8 @@ async def list_addresses(update, context: ContextTypes.DEFAULT_TYPE):
       await update.message.reply_text(current_message, parse_mode='MarkdownV2')
   else:
     await update.message.reply_text(
-        "No whitelisted Solana addresses found for this chat, to donate to the bot: 9ex8SZWhb2X5MRmqZt4Uu9UEbWtRbJDnMozbyN5sCU7N"
-    )
+        "No whitelisted Solana addresses found for this chat, to donate to the bot: `9ex8SZWhb2X5MRmqZt4Uu9UEbWtRbJDnMozbyN5sCU7N`",
+        parse_mode='MarkdownV2')
 
 
 async def toggleYap(update, context: ContextTypes.DEFAULT_TYPE):
