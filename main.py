@@ -16,7 +16,7 @@ YAP = False
 
 async def is_user_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
   """Check if the user is an admin of the chat."""
-  user_id = update.effective_user.username
+  user_id = update.effective_user.id
   chat_id = update.effective_chat.id
 
   # For private chats, the user is considered an admin.
