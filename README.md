@@ -43,6 +43,9 @@ Create a `.env` file in the root directory of your project and add your Telegram
 YOUR_BOT_TOKEN=your_telegram_bot_token_here
 ```
 
+You can get this key by talking to @ https://t.me/BotFather
+and creating a new bot to use the token
+
 ## Usage
 
 After installation, you can run the bot with:
