@@ -1,6 +1,8 @@
 
 # Solana Address Tracker Bot for Telegram
 
+[![Run on Replit](https://binbashbanana.github.io/deploy-buttons/buttons/official/replit.svg)](https://replit.com/github/@JonGan2/TelegramWhitelistBot)
+
 This project is a Telegram bot designed to manage and track Solana addresses in a chat, allowing users to add their Solana addresses to a whitelist. This bot features commands for admins to enable or disable the adding of new addresses and to list all whitelisted addresses. It uses Python with the `python-telegram-bot` library and includes functionality to check if a user is an admin, manage a list of addresses with no duplicates, and toggle response behavior dynamically.
 
 ## Table of Contents
