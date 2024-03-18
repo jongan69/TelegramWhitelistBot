@@ -18,11 +18,9 @@ async def is_user_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
   """Check if the user is an admin of the chat."""
   user_id = update.effective_user.id
   chat_id = update.effective_chat.id
-
   # For private chats, the user is considered an admin.
   if update.effective_chat.type == "private":
     return True
-
   # Check admin status in non-private chats.
   admins = await context.bot.get_chat_administrators(chat_id)
   return any(admin.user.id == user_id for admin in admins)
@@ -35,7 +33,6 @@ async def start_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
       await update.message.reply_text(
           "This command can only be used by administrators.")
     return
-
   chat_id = str(update.message.chat.id)
   addresses = read_addresses()
   if chat_id not in addresses:
@@ -54,7 +51,6 @@ async def stop_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
       await update.message.reply_text(
           "This command can only be used by administrators.")
     return
-
   chat_id = str(update.message.chat.id)
   addresses = read_addresses()
   if chat_id not in addresses:
@@ -72,7 +68,6 @@ async def message_handler(update, context: ContextTypes.DEFAULT_TYPE):
   user_id = str(update.effective_user.username)
   message_text = update.message.text
   solana_matches = re.findall(SOLANA_ADDRESS_PATTERN, message_text)
-
   if solana_matches:
     addresses = read_addresses()
     if chat_id not in addresses or not addresses[chat_id].get(
@@ -120,7 +115,6 @@ async def list_addresses(update, context: ContextTypes.DEFAULT_TYPE):
     base_message = "Whitelisted Solana addresses:\n"
     current_message = base_message
     all_addresses = addresses[chat_id]["addresses"]
-
     for user in all_addresses:
       address = all_addresses[user]
       # If adding another address exceeds the limit, send the current message and start a new one.
@@ -129,7 +123,6 @@ async def list_addresses(update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(current_message)
         current_message = base_message  # Reset with the base message for continuity.
       current_message += f"User @{user} has wallet `{address}`" + "\n"
-
     # Send any remaining addresses in the final chunk.
     if current_message != base_message:
       await update.message.reply_text(current_message, parse_mode='MarkdownV2')
@@ -151,17 +144,36 @@ async def toggleYap(update, context: ContextTypes.DEFAULT_TYPE):
   return YAP
 
 
-def main():
+async def export_addresses(update, context: ContextTypes.DEFAULT_TYPE):
+  """Export whitelisted Solana addresses to a CSV file."""
+  chat_id = str(update.message.chat.id)
+  addresses = read_addresses()
+  if chat_id in addresses and addresses[chat_id]:
+    csv_content = "Wallet Address\n"
+    all_addresses = addresses[chat_id]["addresses"]
+    for user in all_addresses:
+      address = all_addresses[user]
+      csv_content += f"{address}\n"
+    with open("solana_addresses_export.csv", "w") as csv_file:
+      csv_file.write(csv_content)
+    await update.message.reply_document(
+        document=open("solana_addresses_export.csv", "rb"))
+  else:
+    await update.message.reply_text(
+        "No whitelisted Solana addresses found to export.")
 
+
+def main():
   application = Application.builder().token(YOUR_BOT_TOKEN).build()
   application.add_handler(CommandHandler("yap", toggleYap))
   application.add_handler(CommandHandler("start", start_adding))
   application.add_handler(CommandHandler("stop", stop_adding))
   application.add_handler(CommandHandler(
       "list", list_addresses))  # Register the /list command handler
+  application.add_handler(CommandHandler(
+      "export", export_addresses))  # Export Function for csv
   application.add_handler(
       MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-
   print("Bot started with enhanced functionality!", flush=True)
   application.run_polling()
 
